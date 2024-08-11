@@ -1,4 +1,4 @@
-package tcpchattranslation
+package main
 
 import "net"
 
