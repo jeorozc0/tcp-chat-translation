@@ -1,8 +1,11 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net"
+	"strings"
 )
 
 type server struct {
@@ -47,4 +50,63 @@ func (s *server) newClient(conn net.Conn) {
 	}
 	c.readInput()
 
+}
+
+func (s *server) user(c *client, args []string) {
+	c.user = args[1]
+	c.msg(fmt.Sprintf("Your new username is %s", c.user))
+}
+func (s *server) join(c *client, args []string) {
+	roomName := args[1]
+	r, ok := s.rooms[roomName]
+	if !ok {
+		r = &room{
+			name:    roomName,
+			members: make(map[net.Addr]*client),
+		}
+		s.rooms[roomName] = r
+	}
+
+	r.members[c.conn.RemoteAddr()] = c
+
+	s.quitRoom(c)
+	c.room = r
+
+	r.broadcast(c, fmt.Sprintf("%s has joined the room", c.user))
+	c.msg(fmt.Sprintf("Welcome to %s", r.name))
+}
+func (s *server) servers(c *client) {
+	var rooms []string
+	for name := range s.rooms {
+		rooms = append(rooms, name)
+	}
+	c.msg(fmt.Sprintf("Availble rooms: %s", strings.Join(rooms, ",")))
+}
+func (s *server) language(c *client, args []string) {
+	c.language = args[1]
+	c.msg(fmt.Sprintf("Language set to %s", c.language))
+}
+
+func (s *server) message(c *client, args []string) {
+	if c.room == nil {
+		c.err(errors.New("You must be in a room to send messages"))
+		return
+	}
+	c.room.broadcast(c, c.user+": "+strings.Join(args[1:], " "))
+}
+
+func (s *server) quit(c *client) {
+	log.Printf("User has disconnected: %s", c.conn.RemoteAddr().String())
+
+	s.quitRoom(c)
+
+	c.msg("See you soon!")
+	c.conn.Close()
+}
+
+func (s *server) quitRoom(c *client) {
+	if c.room != nil {
+		delete(c.room.members, c.conn.RemoteAddr())
+	}
+	c.room.broadcast(c, fmt.Sprintf("%s has left the room", c.user))
 }
