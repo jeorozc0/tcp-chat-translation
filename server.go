@@ -57,6 +57,10 @@ func (s *server) user(c *client, args []string) {
 	c.msg(fmt.Sprintf("Your new username is %s", c.user))
 }
 func (s *server) join(c *client, args []string) {
+	if len(args) < 2 {
+		c.msg("room name is required. usage: /join ROOM_NAME")
+		return
+	}
 	roomName := args[1]
 	r, ok := s.rooms[roomName]
 	if !ok {
@@ -92,7 +96,7 @@ func (s *server) message(c *client, args []string) {
 		c.err(errors.New("You must be in a room to send messages"))
 		return
 	}
-	c.room.broadcast(c, c.user+": "+strings.Join(args[1:], " "))
+	c.room.broadcast(c, c.user+": "+strings.Join(args[0:], " "))
 }
 
 func (s *server) quit(c *client) {
@@ -106,7 +110,8 @@ func (s *server) quit(c *client) {
 
 func (s *server) quitRoom(c *client) {
 	if c.room != nil {
-		delete(c.room.members, c.conn.RemoteAddr())
+		oldRoom := s.rooms[c.room.name]
+		delete(s.rooms[c.room.name].members, c.conn.RemoteAddr())
+		oldRoom.broadcast(c, fmt.Sprintf("%s has left the room", c.user))
 	}
-	c.room.broadcast(c, fmt.Sprintf("%s has left the room", c.user))
 }
