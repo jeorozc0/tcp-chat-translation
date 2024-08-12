@@ -23,6 +23,6 @@ func main() {
 			log.Printf("Unable to accept connection: %s", err.Error())
 			continue
 		}
-		go s.neClient(conn)
+		go s.newClient(conn)
 	}
 }
