@@ -10,6 +10,7 @@ import (
 type client struct {
 	conn     net.Conn
 	user     string
+	language string
 	room     *room
 	commands chan<- command
 }
