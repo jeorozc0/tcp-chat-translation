@@ -15,9 +15,15 @@ type client struct {
 	commands chan<- command
 }
 
+const PROMPT = ">> "
+
 func (c *client) readInput() {
+	writer := bufio.NewWriter(c.conn)
+	reader := bufio.NewReader(c.conn)
 	for {
-		msg, err := bufio.NewReader(c.conn).ReadString('\n')
+		writer.WriteString(PROMPT)
+		writer.Flush()
+		msg, err := reader.ReadString('\n')
 		if err != nil {
 			return
 		}
@@ -27,51 +33,57 @@ func (c *client) readInput() {
 		args := strings.Split(msg, " ")
 		cmd := strings.TrimSpace(args[0])
 
-		switch cmd {
-		case "/user":
-			c.commands <- command{
-				id:     CMD_USER,
-				client: c,
-				args:   args,
-			}
-		case "/join":
-			c.commands <- command{
-				id:     CMD_JOIN,
-				client: c,
-				args:   args,
-			}
-		case "/server":
-			c.commands <- command{
-				id:     CMD_SERVERS,
-				client: c,
-			}
-		case "/msg":
+		if !strings.HasPrefix(cmd, "/") {
 			c.commands <- command{
 				id:     CMD_MSG,
 				client: c,
 				args:   args,
 			}
-		case "/quit":
-			c.commands <- command{
-				id:     CMD_QUIT,
-				client: c,
+		} else {
+			switch cmd {
+			case "/user":
+				c.commands <- command{
+					id:     CMD_USER,
+					client: c,
+					args:   args,
+				}
+			case "/join":
+				c.commands <- command{
+					id:     CMD_JOIN,
+					client: c,
+					args:   args,
+				}
+			case "/servers":
+				c.commands <- command{
+					id:     CMD_SERVERS,
+					client: c,
+				}
+
+			case "/quit":
+				c.commands <- command{
+					id:     CMD_QUIT,
+					client: c,
+				}
+			case "/lang":
+				c.commands <- command{
+					id:     CMD_LANG,
+					client: c,
+					args:   args,
+				}
+			default:
+				c.err(fmt.Errorf("unknown command: %s", cmd))
 			}
-		case "/lang":
-			c.commands <- command{
-				id:     CMD_LANG,
-				client: c,
-				args:   args,
-			}
-		default:
-			c.err(fmt.Errorf("unknown command: %s", cmd))
 		}
+
 	}
 }
 
 func (c *client) err(err error) {
 	c.conn.Write([]byte("ERR: " + err.Error() + "\n"))
+	c.conn.Write([]byte(PROMPT))
 }
 
 func (c *client) msg(msg string) {
-	c.conn.Write([]byte("> " + msg + "\n"))
+	c.conn.Write([]byte(msg + "\n"))
+	c.conn.Write([]byte(PROMPT))
 }
