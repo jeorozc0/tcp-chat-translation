@@ -6,6 +6,8 @@ import (
 	"log"
 	"net"
 	"strings"
+
+	lang "jeorozco.com/go/tcp-chat-translation/language"
 )
 
 type server struct {
@@ -45,7 +47,7 @@ func (s *server) newClient(conn net.Conn) {
 	c := &client{
 		conn:     conn,
 		user:     "anon",
-		language: "English",
+		language: "english",
 		commands: s.comamnds,
 	}
 	c.readInput()
@@ -54,11 +56,11 @@ func (s *server) newClient(conn net.Conn) {
 
 func (s *server) user(c *client, args []string) {
 	c.user = args[1]
-	c.msg(fmt.Sprintf("Your new username is %s", c.user))
+	c.brd(fmt.Sprintf("Your new username is %s", c.user))
 }
 func (s *server) join(c *client, args []string) {
 	if len(args) < 2 {
-		c.msg("room name is required. usage: /join ROOM_NAME")
+		c.brd("room name is required. usage: /join ROOM_NAME")
 		return
 	}
 	roomName := args[1]
@@ -77,18 +79,28 @@ func (s *server) join(c *client, args []string) {
 	c.room = r
 
 	r.broadcast(c, fmt.Sprintf("%s has joined the room", c.user))
-	c.msg(fmt.Sprintf("Welcome to %s", r.name))
+	c.brd(fmt.Sprintf("Welcome to %s", r.name))
 }
 func (s *server) servers(c *client) {
 	var rooms []string
 	for name := range s.rooms {
 		rooms = append(rooms, name)
 	}
-	c.msg(fmt.Sprintf("Availble rooms: %s", strings.Join(rooms, ",")))
+	c.brd(fmt.Sprintf("Availble rooms: %s", strings.Join(rooms, ",")))
 }
 func (s *server) language(c *client, args []string) {
+	if len(args) < 2 || args[1] == "" {
+		languages := (strings.Join(lang.GetLanguages(), ", "))
+		c.brd(fmt.Sprintf("Supported languages are: %s", languages))
+		return
+	}
+	ok := lang.IsValidLanguage(args[1])
+	if !ok {
+		c.brd(fmt.Sprintf("%s is not a supported language.", args[1]))
+		return
+	}
 	c.language = args[1]
-	c.msg(fmt.Sprintf("Language set to %s", c.language))
+	c.brd(fmt.Sprintf("Language set to %s", c.language))
 }
 
 func (s *server) message(c *client, args []string) {
@@ -96,7 +108,7 @@ func (s *server) message(c *client, args []string) {
 		c.err(errors.New("You must be in a room to send messages"))
 		return
 	}
-	c.room.broadcast(c, c.user+": "+strings.Join(args[0:], " "))
+	c.room.message(c, strings.Join(args[0:], " "))
 }
 
 func (s *server) quit(c *client) {
@@ -104,7 +116,7 @@ func (s *server) quit(c *client) {
 
 	s.quitRoom(c)
 
-	c.msg("See you soon!")
+	c.brd("See you soon!")
 	c.conn.Close()
 }
 
