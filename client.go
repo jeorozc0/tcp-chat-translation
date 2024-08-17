@@ -87,3 +87,8 @@ func (c *client) msg(msg string) {
 	c.conn.Write([]byte(msg + "\n"))
 	c.conn.Write([]byte(PROMPT))
 }
+
+func (c *client) brd(brd string) {
+	c.conn.Write([]byte(brd + "\n"))
+	c.conn.Write([]byte(PROMPT))
+}
