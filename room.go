@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 
 	lang "jeorozco.com/go/tcp-chat-translation/language"
@@ -24,7 +25,7 @@ func (r *room) message(sender *client, msg string) {
 		if addr != sender.conn.RemoteAddr() {
 			translatedMessgae, err := lang.TranslateMsg(msg, sender.language, m.language)
 			if err != nil {
-				m.msg("Couldn't translate message from " + sender.user + ": " + msg)
+				m.msg(fmt.Sprintf("Couldn't translate message from: %v\n ", err))
 				return
 			}
 			m.msg(sender.user + ": " + translatedMessgae)

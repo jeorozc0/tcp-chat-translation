@@ -1,91 +1,53 @@
 package lang
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
+
+	"github.com/sashabaranov/go-openai"
+	"github.com/spf13/viper"
 )
-
-const openAIEndpoint = "https://api.openai.com/v1/chat/completions"
-
-type OpenAIRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type OpenAIResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-}
 
 func TranslateMsg(msg, sourceLang, targetLang string) (string, error) {
 	if sourceLang == targetLang {
 		fmt.Printf("%s same as %s", sourceLang, targetLang)
 		return msg, nil
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	viper.SetConfigFile(".env")
+	err := viper.ReadInConfig()
+
+	if err != nil {
+		return "", fmt.Errorf("Error while reading config file %s", err)
+	}
+	apiKey, ok := viper.Get("OPENAI_API_KEY").(string)
+
+	// If the type is a string then ok will be true
+	// ok will make sure the program not break
+	if !ok {
+		return "", fmt.Errorf("Invalid type assertion")
+	}
 	if apiKey == "" {
 		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
 	}
 
 	prompt := fmt.Sprintf("Translate the following text from %s to %s: %s", sourceLang, targetLang, msg)
 
-	requestBody := OpenAIRequest{
-		Model: "gpt-4o-mini",
-		Messages: []Message{
-			{Role: "user", Content: prompt},
+	client := openai.NewClient(apiKey)
+	resp, err := client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: openai.GPT3Dot5Turbo,
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: prompt,
+				},
+			},
 		},
-	}
-
-	jsonBody, err := json.Marshal(requestBody)
+	)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling request: %v", err)
+		return "", fmt.Errorf("Couldn't translate message: %v\n", err)
 	}
 
-	req, err := http.NewRequest("POST", openAIEndpoint, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error sending request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status code %d: %s", resp.StatusCode, string(body))
-	}
-
-	var openAIResp OpenAIResponse
-	err = json.Unmarshal(body, &openAIResp)
-	if err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %v", err)
-	}
-
-	if len(openAIResp.Choices) == 0 {
-		return "", fmt.Errorf("no translation returned")
-	}
-
-	return openAIResp.Choices[0].Message.Content, nil
+	return resp.Choices[0].Message.Content, nil
 }
